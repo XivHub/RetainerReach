@@ -2,12 +2,13 @@ using System;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
+using XivHubPluginKit.UI;
 
 namespace RetainerReach.Windows
 {
     /// <summary>
     /// Settings window: the <see cref="Configuration.MoveTickGap"/> slider, appearance prefs
-    /// (icon scale, column visibility), and a Dev section
+    /// (icon scale, column visibility, the shared XIV Hub theme), and a Dev section
     /// (<see cref="Configuration.DevLog"/>/<see cref="Configuration.DevLogUrl"/>) for the
     /// XivHubPluginKit <c>DevTelemetry</c> wiring in <c>Plugin.cs</c>.
     /// </summary>
@@ -103,6 +104,11 @@ namespace RetainerReach.Windows
                 cfg.ShowVendorColumn = showVendor;
                 cfg.Save();
             }
+
+            ImGui.Spacing();
+            ImGui.TextColored(HubStyle.Faint, "Theme, shared with every XIV Hub plugin.");
+            ImGui.Spacing();
+            HubThemeEditor.Draw(Plugin.ThemeConfig);
         }
 
         private void DrawDevSection()

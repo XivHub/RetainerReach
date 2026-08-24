@@ -15,20 +15,24 @@ using RetainerReach.Ipc;
 using RetainerReach.Logic;
 using RetainerReach.Model;
 using XivHubPluginKit.Inventory;
+using XivHubPluginKit.UI;
 
 namespace RetainerReach.Windows
 {
     public class MainWindow : Window, IDisposable
     {
-        private static readonly Vector4 WarnColor = new(0.90f, 0.30f, 0.30f, 1f);
-        private static readonly Vector4 AccentColor = new(0.85f, 0.74f, 0.42f, 1f);
-        private static readonly Vector4 OvershootColor = new(0.90f, 0.45f, 0.30f, 1f);
-
-        // Grid "slot" look, approximating the native inventory cell: dark rounded background + a
-        // subtle warm border, icon inset 1px inside it.
+        // Grid "slot" look, approximating the native inventory cell: a recessed well one step below
+        // the window on the surface ramp, rimmed one step above it, icon inset 1px inside it.
         private const float SlotRounding = 3f;
-        private static readonly Vector4 SlotBg = new(0.09f, 0.09f, 0.11f, 0.95f);
-        private static readonly Vector4 SlotBorder = new(0.34f, 0.31f, 0.26f, 0.75f);
+        private static Vector4 SlotBg => HubColors.Get("HubGround", 0.95f);
+        private static Vector4 SlotBorder => HubColors.Get("HubSurface");
+
+        // Cell overlays are painted straight onto the draw list over arbitrary icon art, so they
+        // carry their own contrast: a near-black plate/shadow and the text colour on top of it.
+        private static Vector4 CellShade => HubColors.Get("HubGround", 0.90f);
+        private static Vector4 CellPlate => HubColors.Get("HubGround", 0.55f);
+        private static Vector4 CellHover => HubColors.Get("HubText", 0.60f);
+        private static Vector4 CellSelected => HubColors.Get("HubGold", 0.30f);
 
         private readonly Configuration cfg;
 
@@ -351,7 +355,7 @@ namespace RetainerReach.Windows
 
         private void DrawHeader()
         {
-            using (ImRaii.PushColor(ImGuiCol.Text, AccentColor))
+            using (ImRaii.PushColor(ImGuiCol.Text, HubStyle.Accent))
             {
                 Icon(FontAwesomeIcon.Box);
                 ImGui.SameLine();
@@ -365,7 +369,7 @@ namespace RetainerReach.Windows
 
         private void DrawNotReadyBanner()
         {
-            using (ImRaii.PushColor(ImGuiCol.Text, WarnColor))
+            using (ImRaii.PushColor(ImGuiCol.Text, HubStyle.Warn))
             {
                 ImGui.TextWrapped("AllaganTools not ready — install/enable AllaganTools and let it finish scanning before this view is accurate.");
             }
@@ -477,7 +481,7 @@ namespace RetainerReach.Windows
             if (filtersActive)
             {
                 ImGui.SameLine();
-                using (ImRaii.PushColor(ImGuiCol.Text, AccentColor))
+                using (ImRaii.PushColor(ImGuiCol.Text, HubStyle.Accent))
                     ImGui.TextUnformatted("• filters on");
             }
 
@@ -681,9 +685,9 @@ namespace RetainerReach.Windows
             dl.AddImage(handle, min, max);
 
             if (isSelected)
-                dl.AddRect(min, max, ImGui.GetColorU32(AccentColor), 2f, ImDrawFlags.None, 2f);
+                dl.AddRect(min, max, ImGui.GetColorU32(HubStyle.Accent), 2f, ImDrawFlags.None, 2f);
             else if (hovered)
-                dl.AddRect(min, max, ImGui.GetColorU32(new Vector4(1f, 1f, 1f, 0.6f)), 2f, ImDrawFlags.None, 1.5f);
+                dl.AddRect(min, max, ImGui.GetColorU32(CellHover), 2f, ImDrawFlags.None, 1.5f);
 
             if (hovered)
                 ImGui.SetTooltip($"{cat.Name} ({cat.Count})");
@@ -1262,7 +1266,7 @@ namespace RetainerReach.Windows
             DrawSlotFrame(dl, min, max);
 
             if (isSelected)
-                dl.AddRectFilled(min, max, ImGui.GetColorU32(new Vector4(AccentColor.X, AccentColor.Y, AccentColor.Z, 0.30f)), SlotRounding, ImDrawFlags.None);
+                dl.AddRectFilled(min, max, ImGui.GetColorU32(CellSelected), SlotRounding, ImDrawFlags.None);
 
             if (ItemIcon.TryGetGameIconHandle(item.IconId, item.Hq, out var handle))
                 dl.AddImage(handle, new Vector2(min.X + 1f, min.Y + 1f), new Vector2(max.X - 1f, max.Y - 1f));
@@ -1275,17 +1279,17 @@ namespace RetainerReach.Windows
             // Bottom-right, left-clamped so a long stack count can't overflow the cell's left edge.
             var qtyPos = new Vector2(MathF.Max(min.X + 2f, max.X - qtySize.X - 3f), max.Y - qtySize.Y - 2f);
             // Dark plate behind the number so it reads over any icon art.
-            dl.AddRectFilled(qtyPos - new Vector2(2f, 1f), qtyPos + qtySize + new Vector2(2f, 1f), ImGui.GetColorU32(new Vector4(0f, 0f, 0f, 0.55f)), 2f, ImDrawFlags.None);
+            dl.AddRectFilled(qtyPos - new Vector2(2f, 1f), qtyPos + qtySize + new Vector2(2f, 1f), ImGui.GetColorU32(CellPlate), 2f, ImDrawFlags.None);
             DrawCellText(dl, qtyPos, qty);
 
             // Accent dot (top-right) when the item is split across more than one retainer.
             if (item.Holdings.Count > 1)
-                dl.AddCircleFilled(new Vector2(max.X - 5f, min.Y + 5f), 2.5f, ImGui.GetColorU32(AccentColor));
+                dl.AddCircleFilled(new Vector2(max.X - 5f, min.Y + 5f), 2.5f, ImGui.GetColorU32(HubStyle.Accent));
 
             if (isSelected)
-                dl.AddRect(min, max, ImGui.GetColorU32(AccentColor), SlotRounding, ImDrawFlags.None, 2f);
+                dl.AddRect(min, max, ImGui.GetColorU32(HubStyle.Accent), SlotRounding, ImDrawFlags.None, 2f);
             else if (hovered)
-                dl.AddRect(min, max, ImGui.GetColorU32(new Vector4(1f, 1f, 1f, 0.6f)), SlotRounding, ImDrawFlags.None, 1.5f);
+                dl.AddRect(min, max, ImGui.GetColorU32(CellHover), SlotRounding, ImDrawFlags.None, 1.5f);
 
             DrawRowContextMenu(item, key, isSelected);
 
@@ -1296,8 +1300,8 @@ namespace RetainerReach.Windows
         /// <summary>Cell-overlay text with a 1px dark shadow so it stays legible over any icon art.</summary>
         private static void DrawCellText(ImDrawListPtr dl, Vector2 pos, string text)
         {
-            dl.AddText(pos + new Vector2(1f, 1f), ImGui.GetColorU32(new Vector4(0f, 0f, 0f, 0.9f)), text);
-            dl.AddText(pos, ImGui.GetColorU32(new Vector4(1f, 1f, 1f, 1f)), text);
+            dl.AddText(pos + new Vector2(1f, 1f), ImGui.GetColorU32(CellShade), text);
+            dl.AddText(pos, ImGui.GetColorU32(HubStyle.Text), text);
         }
 
         /// <summary>Draws the native-style slot background + border for a cell rect (shared by filled and empty slots).</summary>
@@ -1620,6 +1624,7 @@ namespace RetainerReach.Windows
             var reasons = RetrieveLauncher.DisabledReasons(cfg);
 
             using (ImRaii.Disabled(!hasSelection || reasons.Count > 0))
+            using (HubStyle.Primary())
             {
                 if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Truck, "Retrieve selected"))
                 {
@@ -1639,7 +1644,7 @@ namespace RetainerReach.Windows
             else if (reasons.Count > 0)
             {
                 ImGui.SameLine();
-                using (ImRaii.PushColor(ImGuiCol.Text, WarnColor))
+                using (ImRaii.PushColor(ImGuiCol.Text, HubStyle.Warn))
                     ImGui.TextWrapped($"Disabled: {string.Join(", ", reasons)}");
             }
         }
@@ -1691,7 +1696,7 @@ namespace RetainerReach.Windows
 
             if (!Guards.SafeToAct())
             {
-                using (ImRaii.PushColor(ImGuiCol.Text, WarnColor))
+                using (ImRaii.PushColor(ImGuiCol.Text, HubStyle.Warn))
                     ImGui.TextWrapped("paused: interrupted (cutscene / loading / quest event)");
             }
 
@@ -1723,7 +1728,7 @@ namespace RetainerReach.Windows
                 {
                     if (RetrieveScheduler.ErrorMessage is { } error)
                     {
-                        using (ImRaii.PushColor(ImGuiCol.Text, WarnColor))
+                        using (ImRaii.PushColor(ImGuiCol.Text, HubStyle.Bad))
                             ImGui.TextWrapped(error);
                         ImGui.Spacing();
                     }
@@ -1806,7 +1811,7 @@ namespace RetainerReach.Windows
 
         private void DrawRetainerResult(RetainerResult result)
         {
-            using (ImRaii.PushColor(ImGuiCol.Text, AccentColor))
+            using (ImRaii.PushColor(ImGuiCol.Text, HubStyle.Accent))
                 ImGui.TextUnformatted(result.RetainerName);
 
             ImGui.TextDisabled($"  moved {result.Moved} · failed {result.Failed} · short {result.Short}");
@@ -1827,11 +1832,11 @@ namespace RetainerReach.Windows
             switch (target.Outcome)
             {
                 case TargetOutcome.Failed:
-                    using (ImRaii.PushColor(ImGuiCol.Text, WarnColor))
+                    using (ImRaii.PushColor(ImGuiCol.Text, HubStyle.Bad))
                         DrawIndentedIconLine(target.ItemId, target.Hq, line, wrap: true);
                     break;
                 case TargetOutcome.Short:
-                    using (ImRaii.PushColor(ImGuiCol.Text, OvershootColor))
+                    using (ImRaii.PushColor(ImGuiCol.Text, HubStyle.Warn))
                         DrawIndentedIconLine(target.ItemId, target.Hq, line, wrap: true);
                     break;
                 default:
@@ -1892,7 +1897,7 @@ namespace RetainerReach.Windows
 
             if (RetrieveScheduler.ErrorMessage is { } error)
             {
-                using (ImRaii.PushColor(ImGuiCol.Text, WarnColor))
+                using (ImRaii.PushColor(ImGuiCol.Text, HubStyle.Bad))
                     ImGui.TextWrapped(error);
             }
         }
@@ -2094,7 +2099,7 @@ namespace RetainerReach.Windows
                 RecomputeSummary();
 
             // Prebuilt one-line summary (rebuilt only in RecomputeSummary), no per-frame interpolation.
-            using (ImRaii.PushColor(ImGuiCol.Text, WarnColor, summaryOverflow))
+            using (ImRaii.PushColor(ImGuiCol.Text, HubStyle.Warn, summaryOverflow))
                 ImGui.TextUnformatted(summaryLine);
         }
 
