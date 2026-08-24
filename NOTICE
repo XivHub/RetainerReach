@@ -1,0 +1,14 @@
+RetainerReach
+Copyright (C) 2026 Zhyra
+
+This program is free software: you can redistribute it and/or modify it under the
+terms of the GNU Affero General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later version.
+
+This product includes work adapted from the following projects:
+
+AutoRetainer — https://github.com/PunishXIV/AutoRetainer
+Copyright (c) 2023, Puni.sh
+Licensed under the BSD 3-Clause License.
+The summoning-bell interaction distance in Automation/BellFinder.cs is taken
+from AutoRetainer's value for the same check.

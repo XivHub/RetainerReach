@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+	<PropertyGroup>
+		<Authors>Zhyra</Authors>
+		<Company>ZhyraPlugins</Company>
+		<Version>0.10.2</Version>
+		<Description>Retrieve items from your retainers into your bags.</Description>
+		<PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
+		<IsPackable>false</IsPackable>
+		<LangVersion>latest</LangVersion>
+		<AssemblyName>RetainerReach</AssemblyName>
+		<RootNamespace>RetainerReach</RootNamespace>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="ECommons" Version="3.2.1.6" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Compile Include="..\..\XivHubPluginKit\KitServices.cs" Link="Kit\KitServices.cs" />
+		<Compile Include="..\..\XivHubPluginKit\Inventory\ItemSheet.cs" Link="Kit\Inventory\ItemSheet.cs" />
+		<Compile Include="..\..\XivHubPluginKit\Inventory\InventoryScan.cs" Link="Kit\Inventory\InventoryScan.cs" />
+		<Compile Include="..\..\XivHubPluginKit\Inventory\SlotView.cs" Link="Kit\Inventory\SlotView.cs" />
+		<Compile Include="..\..\XivHubPluginKit\DevTelemetry.cs" Link="Dev\DevTelemetry.cs" />
+	</ItemGroup>
+
+</Project>
