@@ -80,6 +80,7 @@ namespace RetainerReach.Logic
                         // Task 4.3: category/material-eligible/icon data is resolved here, once per
                         // build, so the Draw path never re-hits a Lumina sheet per row per frame.
                         var categoryId = ItemCategories.CategoryOf(itemId);
+                        var sheetRow = ItemSheet.ById(itemId);
                         item = new UnifiedItem
                         {
                             ItemId = itemId,
@@ -88,9 +89,12 @@ namespace RetainerReach.Logic
                             CategoryId = categoryId,
                             CategoryName = ItemCategories.NameFor(categoryId),
                             SearchCategoryId = ItemSearchCategories.CategoryOf(itemId),
-                            IconId = ItemSheet.ById(itemId)?.Icon ?? 0,
-                            Ilvl = ItemSheet.Ilvl(itemId),
-                            VendorPrice = ItemSheet.ById(itemId)?.PriceLow ?? 0,
+                            IconId = sheetRow?.Icon ?? 0,
+                            Ilvl = (ushort)(sheetRow?.LevelItem.RowId ?? 0),
+                            VendorPrice = sheetRow?.PriceLow ?? 0,
+                            StackSize = sheetRow?.StackSize ?? 0,
+                            Untradable = sheetRow?.IsUntradable ?? false,
+                            Unique = sheetRow?.IsUnique ?? false,
                         };
                         groups[key] = item;
                     }

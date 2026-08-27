@@ -34,6 +34,11 @@ namespace RetainerReach.Windows
         private static Vector4 CellHover => HubColors.Get("HubText", 0.60f);
         private static Vector4 CellSelected => HubColors.Get("HubGold", 0.30f);
 
+        // Interpunct joiner for the hover tooltip's fact lines, plus the scratch list they're
+        // assembled in. Only one item is ever hovered, so one reused list covers every call site.
+        private const string FactSeparator = "  ·  ";
+        private static readonly List<string> tooltipFacts = new(3);
+
         private readonly Configuration cfg;
 
         // Cached view state — UnifiedInventory.Build() is only re-run on Refresh, never every frame.
@@ -382,6 +387,12 @@ namespace RetainerReach.Windows
             // (DrawSelectionBar iterates it). DrawItemTable re-checks viewDirty after the sort-spec read.
             if (viewDirty)
                 RecomputeView();
+
+            // Likewise for the summary: the item hover tooltip reads browseSummary.FreeBagSlots, and it
+            // draws above DrawSummary. Still summaryDirty-gated, so this is not a per-frame recompute —
+            // DrawSummary re-checks the flag for edits made mid-draw (a cell click marks it dirty).
+            if (summaryDirty)
+                RecomputeSummary();
 
             DrawToolbar();
             ImGui.Spacing();
@@ -1235,7 +1246,7 @@ namespace RetainerReach.Windows
         /// stack quantity (corner), HQ glyph, and selection/hover highlight painted over its rect via
         /// the window draw list. Left-click toggles selection (same <see cref="selection"/> dict as the
         /// table checkbox), right-click opens the shared <see cref="DrawRowContextMenu"/>, hover shows
-        /// <see cref="DrawGridCellTooltip"/>. Reads only pre-stamped <see cref="UnifiedItem"/> fields.
+        /// <see cref="DrawItemTooltip"/>. Reads only pre-stamped <see cref="UnifiedItem"/> fields.
         /// </summary>
         private void DrawGridCell(UnifiedItem item, float cell)
         {
@@ -1294,7 +1305,7 @@ namespace RetainerReach.Windows
             DrawRowContextMenu(item, key, isSelected);
 
             if (hovered)
-                DrawGridCellTooltip(item);
+                DrawItemTooltip(item);
         }
 
         /// <summary>Cell-overlay text with a 1px dark shadow so it stays legible over any icon art.</summary>
@@ -1319,12 +1330,15 @@ namespace RetainerReach.Windows
         }
 
         /// <summary>
-        /// Rich hover tooltip for a grid cell — icon + name (+HQ), then ilvl / category / vendor
-        /// (each gated by the same column-visibility toggle the table uses, so a hidden column stays
-        /// hidden here too), on-retainers / in-bags totals, and a per-retainer holdings breakdown.
-        /// Reads only pre-stamped <see cref="UnifiedItem"/> fields.
+        /// Rich hover tooltip for one Browse item, shared by all three layouts (grid cell, table row,
+        /// grouped row): icon + name (+HQ), the sheet facts (ilvl / category / vendor each gated by the
+        /// same column-visibility toggle the table uses, so a hidden column stays hidden here too),
+        /// stack cap and untradable/unique flags, the on-retainers / in-bags totals, what pulling this
+        /// item costs in bag slots against the free ones, and a per-retainer holdings breakdown.
+        /// Reads only pre-stamped <see cref="UnifiedItem"/> fields plus the memoized
+        /// <see cref="browseSummary"/>, so hovering never touches a Lumina sheet or live game memory.
         /// </summary>
-        private void DrawGridCellTooltip(UnifiedItem item)
+        private void DrawItemTooltip(UnifiedItem item)
         {
             using var tt = ImRaii.Tooltip();
 
@@ -1335,14 +1349,37 @@ namespace RetainerReach.Windows
             }
             ImGui.TextUnformatted(item.Name + HqSuffix(item.Hq));
 
+            tooltipFacts.Clear();
             if (cfg.ShowIlvlColumn)
-                ImGui.TextDisabled($"Item level {item.Ilvl}");
-            if (cfg.ShowCategoryColumn)
-                ImGui.TextDisabled(item.CategoryName);
-            if (cfg.ShowVendorColumn)
-                ImGui.TextDisabled($"Vendor: {item.VendorPrice:N0} gil");
+                tooltipFacts.Add($"Item level {item.Ilvl}");
+            if (cfg.ShowCategoryColumn && item.CategoryName.Length > 0)
+                tooltipFacts.Add(item.CategoryName);
+            if (tooltipFacts.Count > 0)
+                ImGui.TextDisabled(string.Join(FactSeparator, tooltipFacts));
 
-            ImGui.TextUnformatted($"On retainers: {item.TotalRetainerQty}   ·   In bags: {item.PlayerBagQty}");
+            tooltipFacts.Clear();
+            if (item.StackSize > 1)
+                tooltipFacts.Add($"Stacks to {item.StackSize:N0}");
+            if (item.Unique)
+                tooltipFacts.Add("Unique");
+            if (item.Untradable)
+                tooltipFacts.Add("Untradable");
+            if (tooltipFacts.Count > 0)
+                ImGui.TextDisabled(string.Join(FactSeparator, tooltipFacts));
+
+            ImGui.Spacing();
+            ImGui.TextUnformatted($"On retainers: {item.TotalRetainerQty:N0}{FactSeparator}In bags: {item.PlayerBagQty:N0}");
+
+            // Everything below is scoped to the qty a pull would actually move: the requested amount
+            // when the item is selected, otherwise everything the retainers hold.
+            var pullQty = selection.TryGetValue((item.ItemId, item.Hq), out var requestedQty)
+                ? requestedQty
+                : item.TotalRetainerQty;
+
+            DrawTooltipPullCost(item, pullQty);
+
+            if (cfg.ShowVendorColumn && item.VendorPrice > 0)
+                ImGui.TextDisabled($"Vendor: {item.VendorPrice:N0} gil  ({(ulong)item.VendorPrice * pullQty:N0} total)");
 
             ImGui.Separator();
             if (item.Holdings.Count == 0)
@@ -1352,8 +1389,25 @@ namespace RetainerReach.Windows
             else
             {
                 foreach (var holding in item.Holdings)
-                    ImGui.TextUnformatted($"{holding.RetainerName}: {holding.Qty}");
+                    ImGui.TextUnformatted($"{holding.RetainerName}: {holding.Qty:N0}");
             }
+        }
+
+        /// <summary>
+        /// The tooltip's "what would pulling this cost me" line: the bag slots <paramref name="qty"/>
+        /// needs — one per holding touched, since the native retrieve command is whole-stack-only — and
+        /// how many bag slots are free. Turns <see cref="HubStyle.Warn"/> when the pull would not fit,
+        /// matching the summary line's overflow colouring. Free slots come from the
+        /// <see cref="summaryDirty"/>-gated <see cref="browseSummary"/>, never a per-frame
+        /// <see cref="InventoryScan.FreeSlotsInBag"/> call.
+        /// </summary>
+        private void DrawTooltipPullCost(UnifiedItem item, uint qty)
+        {
+            var slots = RetrievePlanner.HoldingsNeeded(item, qty);
+            var free = browseSummary.FreeBagSlots;
+
+            using (ImRaii.PushColor(ImGuiCol.Text, HubStyle.Warn, slots > free))
+                ImGui.TextUnformatted($"Pulling {qty:N0} needs {slots} {(slots == 1 ? "slot" : "slots")}{FactSeparator}{free} free");
         }
 
         private void DrawItemRow(UnifiedItem item)
@@ -1386,12 +1440,12 @@ namespace RetainerReach.Windows
                 ItemIcon.AlignTextToIcon();
             }
 
-            // Draw first, then only measure-for-truncation on the one row actually hovered — avoids a
-            // full name marshal+CalcTextSize on every visible row every frame.
-            var availWidth = ImGui.GetContentRegionAvail().X;
+            // Same hover tooltip the grid cells get, so Table and Grouped aren't the poor relations —
+            // and since it leads with the full name it also covers the truncated-name case the old
+            // measure-on-hover tooltip existed for.
             ImGui.TextUnformatted(item.Name);
-            if (ImGui.IsItemHovered() && ImGui.CalcTextSize(item.Name).X > availWidth)
-                ImGui.SetTooltip(item.Name);
+            if (ImGui.IsItemHovered())
+                DrawItemTooltip(item);
 
             // Task 6.1: right-click context menu attached to the item-name cell (the widget just
             // drawn above). Scoped under this row's PushId (top of the method), so "##rowctx" is a

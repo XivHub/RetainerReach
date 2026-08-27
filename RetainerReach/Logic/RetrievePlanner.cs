@@ -58,5 +58,30 @@ namespace RetainerReach.Logic
 
             return batch;
         }
+
+        /// <summary>
+        /// How many of <paramref name="item"/>'s holdings the fill-then-spill walk in <see cref="Plan"/>
+        /// would consume to cover <paramref name="qty"/>. Each consumed holding becomes one
+        /// <see cref="RetrieveTarget"/>, so this is the same per-item bag-slot estimate the Browse
+        /// summary derives from <c>RetrieveBatch.Targets.Count</c>.
+        /// </summary>
+        public static int HoldingsNeeded(UnifiedItem item, uint qty)
+        {
+            var remaining = qty;
+            var needed = 0;
+
+            foreach (var holding in item.Holdings)
+            {
+                if (remaining == 0)
+                    break;
+                if (holding.Qty == 0)
+                    continue;
+
+                remaining -= remaining < holding.Qty ? remaining : holding.Qty;
+                needed++;
+            }
+
+            return needed;
+        }
     }
 }

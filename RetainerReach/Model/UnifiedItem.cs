@@ -35,6 +35,12 @@ namespace RetainerReach.Model
         // (sell-to-vendor price, never per frame/per row) so the Browse "Vendor" column, its sort
         // key, and the selection gil total never touch a Lumina sheet in the Draw path.
         public uint VendorPrice;
+
+        // Stamped once by UnifiedInventory.Build() from the Item sheet, so the Browse hover tooltip
+        // never touches Lumina in the Draw path. StackSize is the per-slot cap (1 = does not stack).
+        public uint StackSize;
+        public bool Untradable;
+        public bool Unique;
     }
 
     /// <summary>A single retainer's stake in a <see cref="UnifiedItem"/> group.</summary>
