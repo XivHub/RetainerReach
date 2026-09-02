@@ -104,6 +104,8 @@ live client. Consolidated from `PLAN.md`'s "Needs In-Game Verification" section 
    (`MaxLandingChecks`/`TickPulling*`), `Windows/ConfigWindow.cs` (the slider, currently 1-10).
 10. AutoRetainerAPI availability/version and the `OnRetainerReadyToPostprocess` handshake — relevant
     only if Phase 8 (AutoRetainer postprocess secondary driver, optional/not built) is picked up later.
+    Read `~/dev/FFXIV_AUTORETAINER_IPC.md` first: the registration lasts one retainer and must be made
+    from inside `OnRetainerAdditionalTask`, and registering at load fails silently.
 11. `InventoryManager.MoveItemSlot` return codes for InventoryCleaner's player-internal moves (shared
     unknown with the XivHubPluginKit `MoveQueue`; unaffected by RetainerReach's retrieve path, which
     never uses `MoveItemSlot`).
