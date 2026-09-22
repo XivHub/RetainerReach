@@ -45,35 +45,12 @@ namespace RetainerReach.Logic
         {
             var groups = new Dictionary<(uint ItemId, bool Hq), UnifiedItem>();
 
-            var owned = AllaganToolsIpc.CharactersOwnedByActive(true);
-            ulong playerCid = AllaganToolsIpc.CurrentCharacter();
-
-            foreach (var cid in owned)
+            foreach (var (cid, holdings) in HoldingsByRetainer())
             {
-                if (cid == playerCid)
-                    continue;
-
-                var rows = AllaganToolsIpc.CharacterItems(cid);
-                if (!IsRetainerInventory(rows))
-                    continue; // FC / other non-retainer CID AT tracks for this character
-
                 string retainerName = RetainerRoster.NameForCid(cid) ?? cid.ToString();
 
-                foreach (var row in rows)
+                foreach (var (itemId, hq, qty) in holdings)
                 {
-                    if (row.Length < 7)
-                        continue;
-
-                    ulong container = row[0];
-                    if (container < RetainerPageRangeStart || container >= RetainerPageRangeEnd)
-                        continue; // crystals/market/gil/equipped — not a retrievable item page
-
-                    uint itemId = (uint)row[2];
-                    uint qty = (uint)row[3];
-                    bool hq = (row[6] & 1UL) != 0;
-                    if (itemId == 0 || qty == 0)
-                        continue;
-
                     var key = (itemId, hq);
                     if (!groups.TryGetValue(key, out var item))
                     {
@@ -115,6 +92,55 @@ namespace RetainerReach.Logic
             PopulatePlayerBagQty(groups);
 
             return groups.Values.ToList();
+        }
+
+        /// <summary>
+        /// What each of the active character's retainers holds, per (ItemId, Hq), straight off the
+        /// AllaganTools rows: no Lumina sheets and no game memory, so a caller off the framework
+        /// thread is served safely. Retainer item pages only — crystals, gil, equipped gear and
+        /// market listings are excluded, so a unit counted here is one that is NOT on sale.
+        /// </summary>
+        public static Dictionary<ulong, List<(uint ItemId, bool Hq, uint Qty)>> HoldingsByRetainer()
+        {
+            var byRetainer = new Dictionary<ulong, List<(uint ItemId, bool Hq, uint Qty)>>();
+
+            var owned = AllaganToolsIpc.CharactersOwnedByActive(true);
+            ulong playerCid = AllaganToolsIpc.CurrentCharacter();
+
+            foreach (var cid in owned)
+            {
+                if (cid == playerCid)
+                    continue;
+
+                var rows = AllaganToolsIpc.CharacterItems(cid);
+                if (!IsRetainerInventory(rows))
+                    continue; // FC / other non-retainer CID AT tracks for this character
+
+                var totals = new Dictionary<(uint ItemId, bool Hq), uint>();
+                foreach (var row in rows)
+                {
+                    if (row.Length < 7)
+                        continue;
+
+                    ulong container = row[0];
+                    if (container < RetainerPageRangeStart || container >= RetainerPageRangeEnd)
+                        continue; // crystals/market/gil/equipped — not a retrievable item page
+
+                    uint itemId = (uint)row[2];
+                    uint qty = (uint)row[3];
+                    bool hq = (row[6] & 1UL) != 0;
+                    if (itemId == 0 || qty == 0)
+                        continue;
+
+                    var key = (itemId, hq);
+                    totals[key] = totals.GetValueOrDefault(key) + qty;
+                }
+
+                if (totals.Count > 0)
+                    byRetainer[cid] = totals.Select(kv => (kv.Key.ItemId, kv.Key.Hq, kv.Value)).ToList();
+            }
+
+            return byRetainer;
         }
 
         /// <summary>

@@ -50,6 +50,9 @@ namespace RetainerReach
         private readonly ConfigWindow configWindow;
         private readonly DevTelemetry telemetry;
 
+        /// <summary>The retainer-inventory reads RetainerReach offers to other plugins.</summary>
+        private readonly RetainerReachIpc ipc;
+
         // Task 7.5: detects scheduler state transitions across ticks (compared here in Plugin.cs,
         // rather than adding a hook to RetrieveScheduler) so DevTelemetry.Log fires once per
         // transition, in addition to the per-tick Snapshot below.
@@ -99,6 +102,8 @@ namespace RetainerReach
                 ShowInHelp = true,
             });
 
+            ipc = new RetainerReachIpc();
+
             PluginInterface.UiBuilder.Draw += DrawUI;
             PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
             PluginInterface.UiBuilder.OpenConfigUi += ToggleConfigUi;
@@ -109,6 +114,7 @@ namespace RetainerReach
         public void Dispose()
         {
             Framework.Update -= OnFrameworkUpdate;
+            ipc.Dispose();
             RetrieveScheduler.Shutdown();
             telemetry.Dispose();
 
