@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using RetainerReach.Model;
 using XivHubPluginKit.Inventory;
+using XivHubPluginKit.Retainer;
 
 namespace RetainerReach.Game
 {
@@ -17,27 +18,6 @@ namespace RetainerReach.Game
     /// </summary>
     public static unsafe class RetainerScan
     {
-        private static readonly InventoryType[] Pages =
-        {
-            InventoryType.RetainerPage1,
-            InventoryType.RetainerPage2,
-            InventoryType.RetainerPage3,
-            InventoryType.RetainerPage4,
-            InventoryType.RetainerPage5,
-            InventoryType.RetainerPage6,
-            InventoryType.RetainerPage7,
-        };
-
-        /// <summary>Every non-empty slot across the summoned retainer's item pages, right now.</summary>
-        public static List<SlotView> LivePages()
-        {
-            var result = new List<SlotView>();
-            foreach (var page in Pages)
-                result.AddRange(InventoryScan.ScanContainer(page));
-
-            return result;
-        }
-
         /// <summary>
         /// For each target, greedily matches live slots by ItemId+Hq and selects whole slots until
         /// the accumulated qty meets or exceeds the requested qty — the retrieve command has no qty
@@ -49,7 +29,7 @@ namespace RetainerReach.Game
         public static List<(InventoryType Page, ushort Slot, uint ItemId, uint Qty)> PickSlots(IEnumerable<RetrieveTarget> targetsForThisRetainer)
         {
             var picks = new List<(InventoryType Page, ushort Slot, uint ItemId, uint Qty)>();
-            var live = LivePages();
+            var live = RetainerRetrieve.LivePages();
             var claimed = new HashSet<(InventoryType, int)>();
 
             foreach (var target in targetsForThisRetainer)

@@ -87,7 +87,7 @@ live client. Consolidated from `PLAN.md`'s "Needs In-Game Verification" section 
    current patch; that invoking it with `(agentModule, slot, RetainerPage*, 0, RetrieveFromRetainer)`
    actually withdraws the slot's stack to player bags while the retainer inventory addon is open and
    the agent is active; the meaning of `a4` (currently passed as `0`, mirroring AutoRetainer); and
-   confirmation that retrieve is whole-stack only (no partial) — `Automation/RetainerCommandInvoker.cs`.
+   confirmation that retrieve is whole-stack only (no partial) — `XivHubPluginKit/Retainer/RetainerRetrieve.cs`.
 7. `RetainerManager` accessors: `IsReady`, `Retainers` name read, `GetActiveRetainer()` CID matching
    AllaganTools' retainer CID — `Game/RetainerRoster.cs`.
 8. **Probe for a qty-aware retrieve before locking in whole-stack-greedy as final.** AutoRetainer's

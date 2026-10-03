@@ -13,6 +13,7 @@ using RetainerReach.Logic;
 using RetainerReach.Model;
 using RetainerReach.Windows;
 using XivHubPluginKit;
+using XivHubPluginKit.Retainer;
 using XivHubPluginKit.UI;
 
 namespace RetainerReach
@@ -291,7 +292,7 @@ namespace RetainerReach
                 if (state == RetrieveScheduler.State.SelectRetainer)
                     line += $" | expectedCid={RetrieveScheduler.CurrentRetainerCid} {RetainerUi.DescribeRetainerList()}";
                 else if (state == RetrieveScheduler.State.OpenInventory)
-                    line += $" | {RetainerUi.DescribeSelectString()}";
+                    line += $" | {RetainerWalk.DescribeSelectString()}";
 
                 return line;
             });

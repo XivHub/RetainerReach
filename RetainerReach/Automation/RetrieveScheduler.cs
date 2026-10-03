@@ -9,6 +9,7 @@ using RetainerReach.Game;
 using RetainerReach.Ipc;
 using RetainerReach.Model;
 using XivHubPluginKit.Inventory;
+using XivHubPluginKit.Retainer;
 
 namespace RetainerReach.Automation
 {
@@ -47,6 +48,8 @@ namespace RetainerReach.Automation
 
         private const int StabilizationFrames = 5;
         private const int DefaultWaitTimeoutMs = 8000;
+        /// <summary>Calls the synchronous cleanup gives the inventory close: one to hide the agent, one per layout, one spare.</summary>
+        private const int CloseInventoryAttempts = 4;
 
         /// <summary>
         /// How long (in frames) a single <c>Retrieve</c> invoke is given to reflect in the live
@@ -240,7 +243,10 @@ namespace RetainerReach.Automation
         /// </summary>
         private static void CloseOpenRetainerUi()
         {
-            RetainerUi.CloseRetainerInventory(force: true);
+            // One action per call (hide the agent, then close a layout), true once
+            // all are done; bounded like the other cleanup so a window that will
+            // not go cannot hold the frame.
+            for (int i = 0; i < CloseInventoryAttempts && RetainerWalk.CloseRetainerInventory(() => true) != true; i++) { }
             RetainerUi.CloseRetainerList(force: true);
             RetainerUi.CloseRetainerAgent(force: true);
         }
@@ -400,13 +406,13 @@ namespace RetainerReach.Automation
         private static void TickOpenInventory()
         {
             if (!waitPending)
-                BeginWait("OpenInventory", () => RetainerUi.SelectEntrustWithdraw() == true, DefaultWaitTimeoutMs);
+                BeginWait("OpenInventory", () => RetainerWalk.ClickEntrustOrWithdraw(RetainerUi.Throttle, () => { }) == true, DefaultWaitTimeoutMs);
 
             if (TryFinishWait(out var failed))
             {
                 if (failed)
                 {
-                    ErrorOut("Timed out opening the retainer's inventory (Entrust or withdraw items).");
+                    ErrorOut($"Timed out opening the retainer's inventory (Entrust or withdraw items). {RetainerWalk.DescribeSelectString()}");
                     return;
                 }
 
@@ -421,7 +427,7 @@ namespace RetainerReach.Automation
             {
                 BeginWait("WaitInventory", () =>
                 {
-                    if (!RetainerUi.RetainerInventoryReady())
+                    if (!RetainerRetrieve.IsInventoryReady())
                     {
                         inventoryStableFrames = 0;
                         return false;
@@ -453,7 +459,7 @@ namespace RetainerReach.Automation
         /// <see cref="RetainerScan.PickSlots"/>"). Calls <see cref="RetainerScan.PickSlots"/> exactly
         /// once with the whole retainer group (matching the flat (Page,Slot,ItemId,Qty) shape from
         /// Task 6.2), then separately re-derives each pick's Hq (via a same-instant
-        /// <see cref="RetainerScan.LivePages"/> lookup — the tuple itself doesn't carry Hq) to
+        /// <see cref="RetainerRetrieve.LivePages"/> lookup — the tuple itself doesn't carry Hq) to
         /// attribute every pick back to the exact <see cref="RetrieveTarget"/> that needs it, which
         /// Task 6.5's per-target accounting requires.
         /// </summary>
@@ -468,7 +474,7 @@ namespace RetainerReach.Automation
                 pulledByTarget[target] = 0;
 
             var hqBySlot = new Dictionary<(InventoryType Container, int SlotIndex), bool>();
-            foreach (var slot in RetainerScan.LivePages())
+            foreach (var slot in RetainerRetrieve.LivePages())
                 hqBySlot[(slot.Container, slot.SlotIndex)] = slot.IsHq;
 
             foreach (var pick in RetainerScan.PickSlots(currentRetainer))
@@ -485,7 +491,7 @@ namespace RetainerReach.Automation
         }
 
         /// <summary>
-        /// The frame-spaced native-command pull loop (Task 6.3): one <see cref="RetainerCommandInvoker.Retrieve"/>
+        /// The frame-spaced native-command pull loop (Task 6.3): one <see cref="RetainerRetrieve.Retrieve"/>
         /// invoke (or one landing-verification check) per <see cref="Configuration.MoveTickGap"/>
         /// frames, driven directly here — NOT the kit <c>MoveQueue</c> (that is <c>MoveItemSlot</c>-based
         /// and used only for InventoryCleaner's player-internal moves; see PLAN.md Architecture
@@ -528,7 +534,7 @@ namespace RetainerReach.Automation
             // cached slot index, the container shifts after each pull (PLAN.md Task 6.3). Exclude
             // deadSlots so a stack that already failed its landing checks isn't re-selected ahead of
             // a distinct, still-untouched stack of the same item.
-            var slot = RetainerScan.LivePages().FirstOrDefault(s =>
+            var slot = RetainerRetrieve.LivePages().FirstOrDefault(s =>
                 s.ItemId == pending.ItemId && s.IsHq == pending.Hq && !deadSlots.Contains((s.Container, s.SlotIndex)));
             if (slot == null)
             {
@@ -540,9 +546,9 @@ namespace RetainerReach.Automation
                 return;
             }
 
-            if (!RetainerCommandInvoker.Retrieve((uint)slot.SlotIndex, slot.Container))
+            if (!RetainerRetrieve.Retrieve((uint)slot.SlotIndex, slot.Container, slot.ItemId, slot.Qty))
             {
-                var reason = RetainerCommandInvoker.Bound
+                var reason = RetainerRetrieve.Bound
                     ? "Lost the retainer inventory mid-pull (addon closed or Retainer agent inactive)."
                     : "The retainer retrieve command is unavailable (signature not bound for this game version).";
                 ErrorOut(reason);
@@ -565,7 +571,7 @@ namespace RetainerReach.Automation
         /// </summary>
         private static void TickPullingVerify()
         {
-            var landed = !RetainerScan.LivePages().Any(s =>
+            var landed = !RetainerRetrieve.LivePages().Any(s =>
                 s.Container == activeSlot.Container &&
                 s.SlotIndex == activeSlot.SlotIndex &&
                 s.ItemId == activePull!.ItemId &&
@@ -657,7 +663,7 @@ namespace RetainerReach.Automation
         private static void TickCloseInventory()
         {
             if (!waitPending)
-                BeginWait("CloseInventory", () => RetainerUi.CloseRetainerInventory() == true, DefaultWaitTimeoutMs);
+                BeginWait("CloseInventory", () => RetainerWalk.CloseRetainerInventory(RetainerUi.Throttle) == true, DefaultWaitTimeoutMs);
 
             if (TryFinishWait(out var failed))
             {

@@ -9,6 +9,7 @@ using ECommons.GameHelpers;
 using ECommons.Throttlers;
 using ECommons.UIHelpers.AddonMasterImplementations;
 using RetainerReach.Game;
+using XivHubPluginKit.Retainer;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Client.UI;
@@ -35,18 +36,13 @@ namespace RetainerReach.Automation
     {
         private const int ThrottleFrames = 10;
 
-        private static string? cachedEntrustWithdrawText;
         private static string? cachedQuitText;
 
         /// <summary>Shared UI-action throttle, mirroring AutoRetainer's <c>Utils.GenericThrottle</c>.</summary>
         private static bool GenericThrottle => FrameThrottler.Throttle("RetainerReach.GenericThrottle", ThrottleFrames);
 
-        /// <summary>
-        /// The localized "Entrust or withdraw items." SelectString entry text (<c>Addon</c> sheet row
-        /// 2378), cached once. NEEDS IN-GAME VERIFICATION (item 4).
-        /// </summary>
-        private static string EntrustWithdrawText
-            => cachedEntrustWithdrawText ??= Svc.Data.GetExcelSheet<Addon>().GetRow(2378).Text.GetText(true);
+        /// <summary><see cref="GenericThrottle"/> for the kit's retainer helpers, which take a throttle.</summary>
+        internal static bool Throttle() => GenericThrottle;
 
         /// <summary>The localized retainer-menu "Quit" entry text (<c>Addon</c> sheet row 2383), cached once — mirrors AutoRetainer's <c>SelectQuit</c>.</summary>
         private static string QuitText
@@ -110,16 +106,6 @@ namespace RetainerReach.Automation
         /// </summary>
         public static bool RetainerMenuReady()
             => GenericHelpers.TryGetAddonByName<AddonSelectString>("SelectString", out var addon) && GenericHelpers.IsAddonReady(&addon->AtkUnitBase);
-
-        /// <summary>Compact dump of the open retainer-menu <c>SelectString</c> (entry texts + the target text), for diagnostics/telemetry.</summary>
-        public static string DescribeSelectString()
-        {
-            if (!GenericHelpers.TryGetAddonByName<AddonSelectString>("SelectString", out var addon) || !GenericHelpers.IsAddonReady(&addon->AtkUnitBase))
-                return "SelectString=(not open)";
-
-            var master = new AddonMaster.SelectString(addon);
-            return $"SelectString entries=[{string.Join(" | ", master.Entries.Select(e => $"'{e.Text}'"))}] target='{EntrustWithdrawText}'";
-        }
 
         /// <summary>True when the RetainerList addon is present and ready.</summary>
         public static bool RetainerListOpen()
@@ -185,39 +171,6 @@ namespace RetainerReach.Automation
         }
 
         /// <summary>
-        /// Selects the "Entrust or withdraw items." SelectString entry (<c>Addon</c> row 2378),
-        /// which loads the retainer's <c>RetainerPage*</c> containers into memory.
-        /// </summary>
-        public static bool? SelectEntrustWithdraw()
-        {
-            if (!GenericHelpers.TryGetAddonByName<AddonSelectString>("SelectString", out var addon) || !GenericHelpers.IsAddonReady(&addon->AtkUnitBase))
-                return false;
-
-            var text = EntrustWithdrawText;
-            var master = new AddonMaster.SelectString(addon);
-            foreach (var entry in master.Entries)
-            {
-                if (!MenuEntryMatches(entry.Text, text))
-                    continue;
-
-                if (GenericThrottle)
-                {
-                    entry.Select();
-                    return true;
-                }
-
-                return false;
-            }
-
-            // Addon is up but no entry matched — dump the actual entries (throttled) so a wrong sheet
-            // row / text-format mismatch surfaces in the log instead of a silent OpenInventory timeout.
-            if (EzThrottler.Throttle("RetainerReach.SelectStringDump", 3000))
-                Svc.Log.Warning($"[RetainerReach] 'Entrust or withdraw items' not found (target \"{text}\"). SelectString entries: {string.Join(" | ", master.Entries.Select(e => e.Text))}");
-
-            return false;
-        }
-
-        /// <summary>
         /// Tolerant menu-entry match: trims and compares case-insensitively, accepting either a
         /// prefix or a substring hit. Deliberately looser than an ordinal exact/prefix match — the
         /// sheet text and the live addon entry can differ by trailing punctuation, an auto-translate
@@ -261,48 +214,9 @@ namespace RetainerReach.Automation
             }
 
             if (EzThrottler.Throttle("RetainerReach.QuitDump", 3000))
-                Svc.Log.Warning($"[RetainerReach] retainer 'Quit' entry (target \"{text}\") not found. {DescribeSelectString()}");
+                Svc.Log.Warning($"[RetainerReach] retainer 'Quit' entry (target \"{text}\") not found. {RetainerWalk.DescribeSelectString()}");
 
             return false;
-        }
-
-        /// <summary>True once the retainer inventory addon ("InventoryRetainer"/"InventoryRetainerLarge") is present and ready.</summary>
-        public static bool RetainerInventoryReady()
-        {
-            if (GenericHelpers.TryGetAddonByName<AtkUnitBase>("InventoryRetainerLarge", out var large) && GenericHelpers.IsAddonReady(large))
-                return true;
-
-            return GenericHelpers.TryGetAddonByName<AtkUnitBase>("InventoryRetainer", out var addon) && GenericHelpers.IsAddonReady(addon);
-        }
-
-        /// <summary>
-        /// Closes the retainer inventory addon, returning to the RetainerList/select-string flow.
-        /// <paramref name="force"/> bypasses the shared <see cref="GenericThrottle"/> — used only by
-        /// the scheduler's synchronous cleanup path (Abort/ErrorOut), which fires all three Close*
-        /// wrappers in one frame and would otherwise lose two of them to the single shared throttle key.
-        /// </summary>
-        public static bool? CloseRetainerInventory(bool force = false)
-        {
-            if (GenericHelpers.TryGetAddonByName<AtkUnitBase>("InventoryRetainerLarge", out var large) && GenericHelpers.IsAddonReady(large))
-            {
-                if (!force && !GenericThrottle)
-                    return false;
-
-                large->Close(true);
-                return true;
-            }
-
-            if (GenericHelpers.TryGetAddonByName<AtkUnitBase>("InventoryRetainer", out var addon) && GenericHelpers.IsAddonReady(addon))
-            {
-                if (!force && !GenericThrottle)
-                    return false;
-
-                addon->Close(true);
-                return true;
-            }
-
-            // Neither addon is open — nothing to close.
-            return true;
         }
 
         /// <summary>Closes the RetainerList addon via <c>FireCallback(1, {Int=-1})</c>, mirroring AutoRetainer. See <see cref="CloseRetainerInventory"/> for <paramref name="force"/>.</summary>
