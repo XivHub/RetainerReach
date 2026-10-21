@@ -24,6 +24,7 @@
 		<Compile Include="..\..\XivHubPluginKit\Inventory\MainBags.cs" Link="Kit\Inventory\MainBags.cs" />
 		<Compile Include="..\..\XivHubPluginKit\Retainer\RetainerRetrieve.cs" Link="Kit\Retainer\RetainerRetrieve.cs" />
 		<Compile Include="..\..\XivHubPluginKit\Retainer\RetainerWalk.cs" Link="Kit\Retainer\RetainerWalk.cs" />
+		<Compile Include="..\..\XivHubPluginKit\Retainer\MarketCounts.cs" Link="Kit\Retainer\MarketCounts.cs" />
 		<Compile Include="..\..\XivHubPluginKit\UI\HubColors.cs" Link="Kit\UI\HubColors.cs" />
 		<Compile Include="..\..\XivHubPluginKit\UI\HubStyle.cs" Link="Kit\UI\HubStyle.cs" />
 		<Compile Include="..\..\XivHubPluginKit\UI\HubThemeConfig.cs" Link="Kit\UI\HubThemeConfig.cs" />
