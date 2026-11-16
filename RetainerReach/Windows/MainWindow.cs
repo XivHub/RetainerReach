@@ -4,11 +4,12 @@ using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.Text;
-using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Interface;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
+using Dalamud.Utility;
+using Lumina.Text;
 using RetainerReach.Automation;
 using RetainerReach.Game;
 using RetainerReach.Ipc;
@@ -1527,15 +1528,15 @@ namespace RetainerReach.Windows
         }
 
         /// <summary>
-        /// Task 6.2: prints a clickable chat item link via the built-in
-        /// <see cref="SeString.CreateItemLink(uint, bool, string?)"/> helper (confirmed against
-        /// Dalamud.dll via ilspycmd — it assembles the rarity color + link + display-name payload
-        /// chain itself), rather than hand-building an <c>ItemPayload</c>/<c>RawPayload.LinkTerminator</c>
-        /// chain.
+        /// Prints a clickable chat item link. Dalamud's <c>PushItemLink</c> builds the rarity colour,
+        /// link and display name, and exists on API 15 and 16 alike.
         /// </summary>
         private void LinkItemInChat(UnifiedItem item)
         {
-            Plugin.ChatGui.Print(SeString.CreateItemLink(item.ItemId, item.Hq));
+            var link = new SeStringBuilder()
+                .PushItemLink(item.ItemId, item.Hq ? ItemKind.Hq : ItemKind.Normal)
+                .ToReadOnlySeString();
+            Plugin.ChatGui.Print(link);
         }
 
         /// <summary>
