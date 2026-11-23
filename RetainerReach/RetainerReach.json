@@ -2,7 +2,7 @@
   "Author": "XivHub",
   "Name": "RetainerReach",
   "Punchline": "Shows all your retainers' items in one grid and retrieves them in one click. Needs AllaganTools.",
-  "Description": "REQUIRES AllaganTools (a.k.a. Allagan Market / InventoryTools) installed and enabled — RetainerReach reads your retainer inventories from it. Unified view of your active character and all retainers' inventories as an in-game-style icon grid, with one-click Retrieve that summons each holding retainer at a nearby Summoning Bell and pulls selected items into your bags. Search by name, filter by category or crafting material, save recurring pulls as presets, and retrieve from chat via /retrieve. This plugin automates in-game actions (retainer bell interaction and item retrieval) on your behalf; use at your own risk with respect to the game's Terms of Service.",
+  "Description": "Shows your character's and all your retainers' inventories in one icon grid, laid out like the game's own. Select items and press Retrieve: it summons each retainer holding them at a nearby Summoning Bell and moves the items into your bags. You can search by name, filter by category or crafting material, save pulls you repeat as presets, and retrieve from chat with /retrieve.\n\nNeeds AllaganTools (also called Allagan Market or InventoryTools) installed and enabled; RetainerReach reads retainer inventories from it. It acts in game for you, using the bell and retrieving items, so use it at your own risk under the game's Terms of Service.",
   "InternalName": "RetainerReach",
   "ApplicableVersion": "any",
   "Tags": [
